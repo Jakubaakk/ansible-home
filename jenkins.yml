@@ -1,0 +1,50 @@
+---
+- name: "Jenkins playbook"
+  hosts: pis
+  become: true
+  become_exe: sudo
+  vars:
+    docker_install_compose: true
+    docker_users:
+      - jakub
+  tasks:
+    - name: Ensure python3-docker is installed
+      apt:
+        name: python3-docker
+        state: present
+        update_cache: true
+
+    - name: Ensure Docker is installed
+      include_role:
+        name: geerlingguy.docker_arm
+
+    - name: Ensure mount directory is present
+      file:
+        path: /mnt/extssd
+        state: directory
+
+    - name: Ensure disk is mounted
+      mount:
+        state: mounted
+        src: /dev/sda1
+        path: /mnt/extssd
+        fstype: ntfs
+
+    - name: Ensure jenkins_home directory is present
+      file:
+        path: /mnt/extssd/jenkins_home
+        state: directory
+
+    - name: Ensure Jenkins container is running
+      docker_container:
+        name: jenkins
+        image: mlucken/jenkins-arm
+        state: started
+        published_ports:
+          - '8080:8080'
+          - '50000:50000'
+        volumes:
+          - '/mnt/extssd/jenkins_home:/var/jenkins_home'
+        restart_policy: unless-stopped
+        privileged: true
+

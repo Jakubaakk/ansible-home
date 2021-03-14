@@ -1,0 +1,58 @@
+---
+- name: "Plex playbook"
+  hosts: pis
+  become: true
+  become_exe: sudo
+  vars:
+    docker_install_compose: true
+    docker_users:
+      - jakub
+  tasks:
+    - name: Ensure python3-docker is installed
+      apt:
+        name: python3-docker
+        state: present
+        update_cache: true
+
+    - name: Ensure Docker is installed
+      include_role:
+        name: geerlingguy.docker_arm
+
+    - name: Ensure mount directory is present
+      file:
+        path: /mnt/extssd
+        state: directory
+
+    - name: Ensure disk is mounted
+      mount:
+       state: mounted
+       src: /dev/sda1
+       path: /mnt/extssd
+       fstype: ntfs
+
+    - name: Ensure config directory is present
+      file:
+       path: /mnt/extssd/config
+       state: directory
+
+    - name: Ensure library directory is present
+      file:
+        path: /mnt/extssd/library
+        state: directory
+
+    - name: Ensure Plex container is running
+      docker_container:
+        name: plex
+        image: ghcr.io/linuxserver/plex:arm32v7-latest
+        state: started
+        env:
+          PUID: "1000"
+          PGID: "1000"
+          VERSION: "docker"
+          PLEX_CLAIM: '#optional'
+        volumes:
+          - '/mnt/extssd/library:/data'
+          - '/mnt/extssd/config:/config'
+        network_mode: host
+        restart_policy: unless-stopped
+        privileged: true
